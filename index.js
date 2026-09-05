@@ -33,7 +33,7 @@ panel.style.display = 'none';
 const header = make('header', 'wnb-header');
 header.append(make('strong', 'wnb-brand', '✦ Notebook'));
 const controls = make('div', 'wnb-actions');
-const closeButton = button('Закрыть блокнот', 'xmark', () => { panel.style.display = 'none'; });
+const closeButton = button('Закрыть блокнот', 'xmark', closePanel);
 closeButton.classList.add('wnb-standalone');
 controls.append(button('Управление вкладками', 'sliders', manageTabs), closeButton); header.append(controls);
 const tabs = make('nav', 'wnb-tabs'); tabs.setAttribute('aria-label', 'Вкладки блокнота'); tabs.setAttribute('role', 'tablist');
@@ -72,8 +72,11 @@ fileInput.addEventListener('change', async () => {
     } catch (error) { notify(error.message, true); }
 });
 panel.append(header, tabsRow, tools, list, footer, fileInput);
-const launcher = button('Открыть Wani Notebook', 'book-open', openPanel, 'Notebook'); launcher.id = 'wnb-launcher';
+const launcher = button('Открыть Wani Notebook', 'book-open', togglePanel); launcher.id = 'wnb-launcher';
+launcher.setAttribute('aria-controls', panel.id); launcher.setAttribute('aria-expanded', 'false');
 document.body.append(panel, launcher);
+const fitLauncher = setupLauncherDrag();
+updateLauncherState();
 const menu = document.getElementById('extensionsMenu');
 if (menu) {
     // Tavern styles its menu rows as divs with an icon and a text span.
@@ -309,7 +312,78 @@ function manageTabs() {
 }
 function openPanel() {
     if (panel.dataset.rptDocked === 'true' && window.WaniRoleplayTools?.open('notebook')) return;
-    panel.style.display = 'flex'; fitWindow();
+    panel.style.display = 'flex'; fitWindow(); updateLauncherState();
+}
+function closePanel() {
+    panel.style.display = 'none'; updateLauncherState();
+}
+function togglePanel() {
+    if (panel.dataset.rptDocked === 'true') { openPanel(); return; }
+    if (panel.style.display === 'none') openPanel(); else closePanel();
+}
+function updateLauncherState() {
+    const open = panel.style.display !== 'none';
+    launcher.setAttribute('aria-expanded', String(open));
+    launcher.setAttribute('aria-label', open ? 'Закрыть Wani Notebook' : 'Открыть Wani Notebook');
+    launcher.title = open ? 'Закрыть Wani Notebook · можно перетаскивать' : 'Открыть Wani Notebook · можно перетаскивать';
+    launcher.classList.toggle('wnb-open', open);
+}
+function setupLauncherDrag() {
+    const key = `${backupKey}:launcher`;
+    let gesture = null, suppressClick = false;
+    function position(left, top) {
+        const width = launcher.offsetWidth || 44, height = launcher.offsetHeight || 44;
+        const x = Math.max(8, Math.min(left, innerWidth - width - 8));
+        const y = Math.max(36, Math.min(top, innerHeight - height - 8));
+        launcher.style.left = `${x}px`; launcher.style.top = `${y}px`;
+        launcher.style.right = 'auto'; launcher.style.bottom = 'auto';
+    }
+    function savePosition() {
+        const rect = launcher.getBoundingClientRect();
+        try { localStorage.setItem(key, JSON.stringify({ left: rect.left, top: rect.top })); }
+        catch { notify('Не удалось сохранить положение кнопки.', true); }
+    }
+    try {
+        const saved = JSON.parse(localStorage.getItem(key));
+        if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) position(saved.left, saved.top);
+    } catch { /* use the default position */ }
+    // Capture prevents the synthetic click at the end of a drag from toggling the window.
+    launcher.addEventListener('click', event => {
+        const dragged = suppressClick; suppressClick = false;
+        if (dragged && event.detail !== 0) { event.preventDefault(); event.stopImmediatePropagation(); }
+    }, true);
+    launcher.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || !event.isPrimary) return;
+        const rect = launcher.getBoundingClientRect();
+        gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, moved: false };
+        suppressClick = false; launcher.setPointerCapture(event.pointerId);
+    });
+    launcher.addEventListener('pointermove', event => {
+        if (!gesture || event.pointerId !== gesture.id) return;
+        const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
+        if (!gesture.moved && Math.hypot(dx, dy) < 5) return;
+        gesture.moved = true; suppressClick = true;
+        launcher.classList.add('wnb-dragging'); position(gesture.left + dx, gesture.top + dy);
+    });
+    function finish(event) {
+        if (!gesture || event.pointerId !== gesture.id) return;
+        const moved = gesture.moved; gesture = null; launcher.classList.remove('wnb-dragging');
+        if (launcher.hasPointerCapture(event.pointerId)) launcher.releasePointerCapture(event.pointerId);
+        if (moved) savePosition();
+        // Captured touch gestures do not consistently synthesize a click.
+        // Handle a stationary touch here and consume a possible compatibility click.
+        if (!moved && event.type === 'pointerup' && event.pointerType === 'touch') {
+            suppressClick = true; togglePanel();
+        }
+    }
+    launcher.addEventListener('pointerup', finish); launcher.addEventListener('pointercancel', finish);
+    launcher.addEventListener('lostpointercapture', finish);
+    const fit = () => {
+        if (!launcher.getClientRects().length) return;
+        const rect = launcher.getBoundingClientRect(); position(rect.left, rect.top);
+    };
+    window.addEventListener('resize', fit);
+    return fit;
 }
 function fitWindow() {
     if (panel.dataset.rptDocked === 'true') return;
@@ -351,7 +425,7 @@ function connect() {
     host.register({ id: 'notebook', title: 'Notebook', element: panel, launcher, controls, display: 'flex', minHeight: 230,
         defaultPage: { id: 'notebook', name: 'Блокнот' },
         onMount() { panel.style.resize = 'none'; },
-        onRelease() { panel.style.resize = ''; fitWindow(); },
+        onRelease() { panel.style.resize = ''; fitWindow(); fitLauncher(); updateLauncherState(); },
     });
 }
 window.addEventListener('wani-roleplay-tools:ready', connect);

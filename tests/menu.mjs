@@ -77,6 +77,53 @@ try {
         await mkdir(path.join(root,'tests/output'),{recursive:true});
         await page.locator('#extensionsMenu').screenshot({path:path.join(root,`tests/output/notebook-menu-${mode}.png`)});
     }
+    await page.goto(`http://127.0.0.1:${server.address().port}/`); await page.waitForFunction(()=>window.ready);
+    await page.locator('#extensionsMenu').evaluate(el=>el.style.setProperty('display','none','important'));
+    const launcher=page.locator('#wnb-launcher'),panel=page.locator('#wnb-panel');
+    const style=await launcher.evaluate(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return {width:r.width,height:r.height,radius:s.borderRadius,text:el.textContent,touch:s.touchAction}});
+    check(style.width===44&&style.height===44&&style.radius==='50%'&&!style.text.trim(), 'floating launcher is a 44px icon-only circle');
+    check(style.touch==='none','launcher permits touch dragging without page scrolling');
+    await launcher.click();check(await panel.isVisible(),'round button opens standalone panel');
+    await launcher.click();check(!await panel.isVisible(),'second click closes standalone panel');
+    async function drag(dx,dy){const r=await launcher.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:8});await page.mouse.up();return r;}
+    const start=await drag(-180,140),moved=await launcher.boundingBox();
+    check(Math.abs(moved.x-start.x+180)<1&&Math.abs(moved.y-start.y-140)<1,'mouse drag moves launcher to pointer');
+    check(!await panel.isVisible(),'release after drag does not open closed panel');
+    await launcher.click();check(await panel.isVisible(),'next click after dragging opens normally');
+    await drag(-80,80);check(await panel.isVisible(),'dragging an open launcher does not close panel');
+    const saved=await launcher.boundingBox();
+    await page.reload();await page.waitForFunction(()=>window.ready);
+    await page.locator('#extensionsMenu').evaluate(el=>el.style.setProperty('display','none','important'));
+    assert.deepEqual(await launcher.boundingBox(),saved);check(true,'launcher position survives reload');
+    await launcher.focus();await launcher.press('Enter');check(await panel.isVisible(),'Enter opens round launcher');
+    await launcher.press('Space');check(!await panel.isVisible(),'Space closes round launcher');
+    // Move the button over the panel: it must remain clickable above its own window.
+    await launcher.click();
+    const p=await panel.boundingBox(),l=await launcher.boundingBox();await drag(p.x+70-l.x,p.y+90-l.y);
+    check(await launcher.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+22,r.y+22))}),'floating button remains above its open panel');
+    await launcher.click();check(!await panel.isVisible(),'button over panel still closes it');
+    await page.setViewportSize({width:390,height:844});
+    await page.waitForFunction(()=>{const r=document.querySelector('#wnb-launcher').getBoundingClientRect();return r.right<=innerWidth-7});
+    const small=await launcher.boundingBox();check(small.x>=8&&small.x+44<=390-8,'launcher stays reachable after viewport shrinks');
+    const cdp=await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+    const touch=await launcher.boundingBox(),x=touch.x+22,y=touch.y+22;
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x-80,y:y+100}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    const touched=await launcher.boundingBox();
+    check(Math.abs(touched.x-touch.x+80)<1&&Math.abs(touched.y-touch.y-100)<1,'touch drag moves the round button');
+    check(!await panel.isVisible(),'touch drag does not synthesize an unwanted toggle');
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touched.x+22,y:touched.y+22}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await page.waitForFunction(()=>document.querySelector('#wnb-panel').style.display==='flex');
+    check(await panel.isVisible(),'touch tap after dragging opens normally');
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touched.x+22,y:touched.y+22}]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await page.waitForFunction(()=>document.querySelector('#wnb-panel').style.display==='none');
+    check(!await panel.isVisible(),'second touch tap closes without double toggling');
+    await launcher.screenshot({path:path.join(root,'tests/output/notebook-launcher.png')});
+    await cdp.detach();
     check(errors.length===0,`no uncaught errors: ${errors.join('; ')}`);
     console.log(`${checks} menu checks passed.`);
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

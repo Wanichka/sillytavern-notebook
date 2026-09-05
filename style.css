@@ -68,7 +68,18 @@
 .wnb-status { flex: 1; font-size: 11px; color: var(--wnb-muted); cursor: pointer; }
 .wnb-hint { font-size: 12px; color: var(--wnb-muted); line-height: 1.5; }
 .wnb-empty { color: var(--wnb-muted); text-align: center; padding: 45px 16px; line-height: 1.6; }
-#wnb-launcher { position: fixed; right: 16px; bottom: 155px; z-index: 9999; border-color: var(--wnb-accent); box-shadow: 0 4px 14px #0004; }
+#wnb-launcher {
+    position: fixed; right: 18px; top: 90px; z-index: 10001;
+    width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0;
+    border: 1px solid color-mix(in srgb, var(--wnb-accent) 70%, transparent); border-radius: 50%;
+    color: #fff; background: color-mix(in srgb, var(--wnb-accent), var(--wnb-bg) 18%);
+    box-shadow: 0 5px 20px #0005; text-shadow: 0 1px 2px #0007;
+    font-size: 16px; touch-action: none; user-select: none;
+    transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+#wnb-launcher:hover { background: color-mix(in srgb, var(--wnb-accent), var(--wnb-text) 11%); }
+#wnb-launcher.wnb-open { box-shadow: 0 0 0 2px color-mix(in srgb, var(--wnb-accent) 45%, transparent), 0 5px 20px #0005; }
+#wnb-launcher.wnb-dragging { cursor: grabbing; }
 #rpt-shell #wnb-panel[data-rpt-docked="true"] {
     position: static !important; width: 100% !important; height: 100% !important;
     min-width: 0 !important; min-height: 0 !important; max-width: none; max-height: none;
