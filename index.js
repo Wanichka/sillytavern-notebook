@@ -75,7 +75,21 @@ panel.append(header, tabsRow, tools, list, footer, fileInput);
 const launcher = button('Открыть Wani Notebook', 'book-open', openPanel, 'Notebook'); launcher.id = 'wnb-launcher';
 document.body.append(panel, launcher);
 const menu = document.getElementById('extensionsMenu');
-if (menu) menu.append(button('Открыть Wani Notebook', 'book-open', openPanel, 'Wani Notebook'));
+if (menu) {
+    // Tavern styles its menu rows as divs with an icon and a text span.
+    // The panel button helper is intentionally scoped to the panel/dialogs.
+    const item = make('div', 'list-group-item flex-container flexGap5 interactable');
+    item.id = 'wnb-menu-button'; item.tabIndex = 0; item.setAttribute('role', 'button');
+    item.setAttribute('aria-label', 'Открыть Wani Notebook');
+    const icon = make('i', 'fa-solid fa-book-open extensionsMenuExtensionButton'); icon.setAttribute('aria-hidden', 'true');
+    item.append(icon, make('span', '', 'Wani Notebook'));
+    item.addEventListener('click', openPanel);
+    item.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault(); event.stopPropagation(); item.click();
+    });
+    menu.append(item);
+}
 
 function notify(message, error = false) {
     const node = make('div', `wnb-toast${error ? ' wnb-error' : ''}`, message); node.setAttribute('role', error ? 'alert' : 'status');
