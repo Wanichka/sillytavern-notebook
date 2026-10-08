@@ -1,38 +1,38 @@
-# Wani Notebook · 0.1.0-beta.4
+# Wani Notebook · 0.1.0
 
-Личный блокнот для SillyTavern: вкладки с отдельными заметками, форматирование и быстрое копирование. Самостоятельная реализация Wanichka, без кода из Extension-Notebook.
+A personal notebook for SillyTavern with tabs, individual notes, rich text formatting, and quick copying. Independently implemented by Wanichka, without code from Extension-Notebook.
 
-## Установка
+## Installation
 
-**Расширения → Установить расширение** → `https://github.com/Wanichka/sillytavern-notebook`. Ветку можно оставить пустой (`main`). Перезагрузи Tavern. Для обновлений используй кнопку обновления в менеджере расширений.
+Go to **Extensions → Install extension** and enter `https://github.com/Wanichka/sillytavern-notebook`. You can leave the branch field empty (`main`). Reload Tavern. Use the update button in the extension manager to install updates.
 
-Открой **Wani Notebook** в меню расширений или круглой плавающей кнопкой с иконкой книги. Повторное нажатие на круглую кнопку закрывает окно. Кнопку можно перетаскивать мышью или пальцем; её положение сохраняется отдельно для пользователя Tavern в этом браузере. Если установлен Roleplay Tools версии 0.1.0, блокнот автоматически появляется на странице **Блокнот**, а отдельная кнопка скрывается. Его можно перенести к другим блокам через настройки Roleplay Tools. Обновлять остальные расширения для подключения не требуется.
+Open **Wani Notebook** from the extensions menu or the round floating button with a book icon. Press the floating button again to close the window. You can drag the button with a mouse or your finger; its position is saved separately for each Tavern user in this browser. If Roleplay Tools 0.1.0 is installed, the notebook automatically appears on its **Notebook** (`Блокнот`) page, and the standalone button is hidden. You can move it to another section in the Roleplay Tools settings. Other extensions do not need to be updated for this integration.
 
-## Возможности
+## Features
 
-- Вкладки: создание, переименование, перестановка. Кнопка **+** закреплена справа и всегда видна; при нехватке места прокручиваются только названия вкладок. Удаление вкладки переносит её записи в первую оставшуюся.
-- Каждая заметка — отдельная карточка: заголовок, сворачивание, копирование и редактор.
-- Редактор: жирный, курсив, подчёркивание, списки, цвет текста и фоновый маркер, сброс оформления; увеличение до всего экрана.
-- Копирование отправляет в буфер только текст заметки, без заголовка. `<теги>` и `{{макросы}}` остаются обычным текстом. Блокнот сам ничего не отправляет модели и не исполняет команды.
-- Вставка в редактор — обычным текстом, без чужих цветов и HTML. Оформление добавляется кнопками редактора.
-- Поиск по заголовкам и тексту всех вкладок; поиск в корзине работает отдельно.
-- Перенос заметки между вкладками и изменение её порядка — внизу редактора.
-- Удалённые заметки остаются в корзине до ручного окончательного удаления. Оттуда их можно восстановить.
-- Экспорт всего блокнота в JSON, включая корзину. Импорт умеет добавлять новые вкладки или заменять блокнот; перед заменой скачивается текущая копия. Импорт из чужого Notebook не предусмотрен.
-- Цвета интерфейса следуют теме Tavern. Назначенные пользователем цвета текста сохраняются при смене темы.
-- Отдельное окно можно перемещать за заголовок и менять размер нижним углом. В Roleplay Tools размерами управляет общая панель. На узком экране используется почти полный экран.
+- **Tabs:** create, rename, and reorder them. The **+** button stays pinned on the right and remains visible; only the tab names scroll when space is limited. Deleting a tab moves its notes to the first remaining tab.
+- **Individual note cards:** each has a title, a collapse button, a copy button, and an editor.
+- **Rich text editor:** bold, italic, underline, lists, text colors, highlighting, clear formatting, and a full-screen mode.
+- **Plain text copying:** copies only the note's contents, without its title. `<tags>` and `{{macros}}` remain plain text. The notebook does not send anything to the model or execute commands.
+- **Plain text pasting:** pasted content does not retain external colors or HTML. Add formatting with the editor's buttons.
+- **Search:** search titles and contents across all tabs. The trash has a separate search.
+- **Note organization:** move notes between tabs and change their order using the controls at the bottom of the editor.
+- **Trash:** deleted notes remain there until you permanently delete them manually. You can restore them.
+- **JSON export and import:** export the entire notebook, including the trash. Import can add new tabs or replace the notebook; a backup of the current notebook is downloaded before replacement. Importing from other Notebook extensions is not supported.
+- **Theme support:** the interface follows Tavern's theme. User-selected text colors are preserved when the theme changes.
+- **Window controls:** drag the standalone window by its header and resize it from the bottom corner. Within Roleplay Tools, the shared panel controls its size. On narrow screens, the notebook uses almost the full screen.
 
-## Сохранение
+## Saving and backups
 
-Заметки общие для чатов **текущего пользователя Tavern**. Данные помещаются в отдельный ключ `wani_notebook_v1` в настройках расширений. Дополнительно при каждом изменении записывается локальная копия в браузере, отдельно для каждого аккаунта Tavern. Отметка **Сохранено** подтверждает запись локальной копии; отправкой настроек на сервер управляет сама Tavern.
+Notes are shared across chats for the **current Tavern user**. Data is stored under the separate `wani_notebook_v1` key in extension settings. Every change also writes a local browser copy, kept separately for each Tavern account. The **Saved** (`Сохранено`) indicator confirms that the local copy has been written; Tavern itself manages saving settings to the server.
 
-Если локальная копия новее серверной, она восстанавливается при запуске. При редактировании из двух вкладок браузера блокнот предлагает выбрать копию, скачивая другую в файл. Это не совместный редактор для одновременной работы с нескольких устройств. Изменение адреса Tavern или браузера не переносит локальную копию; используй экспорт или дождись сохранения настроек сервером. При ошибке сохранения экспортируй блокнот до перезагрузки.
+If the local copy is newer than the server copy, it is restored at startup. When you edit the notebook in two browser tabs, it asks you to choose which copy to keep and downloads the other one to a file. This is not a collaborative editor for simultaneous use on multiple devices. Changing Tavern's address or switching browsers does not transfer the local copy; use export or wait for Tavern to save settings to the server. If saving fails, export the notebook before reloading.
 
-Экспорт стоит делать время от времени: очистка данных браузера удаляет локальные копии, а сброс настроек Tavern — серверные. Файл импорта ограничен 5 МБ; поддерживаются до 100 вкладок и 10 000 заметок, текст одной заметки — до 2 млн символов HTML. Реальный объём локального хранилища зависит от браузера и других расширений.
+Export a backup periodically: clearing browser data removes local copies, and resetting Tavern settings removes server copies. Import files are limited to 5 MB. The notebook supports up to 100 tabs and 10,000 notes, with up to 2 million characters of HTML per note. Available local storage depends on the browser and other extensions.
 
-## Проверка
+## Testing
 
-Браузерные проверки находятся в `tests/browser.mjs`: пройдены 49 проверок, включая сохранение после перезагрузки, точное копирование инжектов, цвета, поиск, корзину, импорт/экспорт, конфликт двух вкладок и отказ локального хранилища. Отдельно проверены видимость и нажатие закреплённого плюса при прокрутке вкладок, в узком окне и с клавиатуры. Используются настоящий код Notebook и Roleplay Tools, а настройки и пользователь Tavern заменены стендом. Сервер Tavern и реальную генерацию этот стенд не запускает.
+The browser test suite is in `tests/browser.mjs`. The recorded results include 49 passing checks covering persistence after reload, exact copying of injection text, colors, search, trash, import/export, conflicts between two browser tabs, and local storage failures. The pinned add-tab button was also checked for visibility and interaction while scrolling tabs, in a narrow window, and with the keyboard. The tests use the actual Notebook and Roleplay Tools code, with a test harness standing in for Tavern settings and the Tavern user. The harness does not run the Tavern server or actual model generation.
 
 ```sh
 npm install --no-save playwright
@@ -40,16 +40,18 @@ npx playwright install chromium
 RPT_HOST_DIR=../roleplay-tools node tests/browser.mjs
 ```
 
-Первый выпуск предназначен для проверки в живой Tavern. Исходный Notebook можно оставить установленным: у этого расширения свои кнопки, имена и хранилище.
+You can keep the original Notebook extension installed: Wani Notebook uses its own controls, names, and storage.
 
-Для скриншотов с настоящими иконками Tavern можно передать `ST_PUBLIC_DIR=/path/to/SillyTavern/public`. Лицензия собственного кода — MIT; стандартные шрифты и иконки предоставляет установленная Tavern.
+For screenshots with Tavern's actual icons, set `ST_PUBLIC_DIR=/path/to/SillyTavern/public`. The extension's own code is licensed under MIT; the installed Tavern provides the standard fonts and icons.
 
-Меню Tavern и плавающая кнопка дополнительно проверяются с настоящими стилями и шрифтами установленной Tavern: пройдены 37 проверок оформления, наведения, смены темы, открытия/закрытия мышью и клавиатурой, перетаскивания, сохранения позиции и сенсорных жестов — с Roleplay Tools и без него.
+The Tavern menu entry and floating button are also tested with the actual styles and fonts from an installed Tavern. The recorded results include 37 passing checks for appearance, hover states, theme changes, opening and closing with a mouse or keyboard, dragging, position persistence, and touch gestures, both with and without Roleplay Tools.
 
 ```sh
 ST_PUBLIC_DIR=/path/to/SillyTavern/public RPT_HOST_DIR=../roleplay-tools node tests/menu.mjs
 ```
 
-В beta.3 пункт Wani Notebook оформлен как стандартная строка меню Tavern: иконка и название на одной строке, цвета и наведение от текущей темы. Доступно открытие мышью, Enter и пробелом.
+## Version history
 
-В beta.4 плавающая кнопка — круглая, 44×44, в стиле Story Notes. Её можно перемещать мышью или пальцем. Повторное нажатие закрывает окно; перетаскивание не переключает его видимость. Положение сохраняется после перезагрузки и ограничивается краями экрана. Кнопка остаётся над собственным окном, чтобы её можно было нажать ещё раз.
+- **0.1.0:** removes the beta designation after regular use in a live Tavern; the README is now in English.
+- **0.1.0-beta.4:** introduced a round 44×44 floating button in the style of Story Notes. It can be dragged with a mouse or finger. Pressing it again closes the window; dragging does not toggle visibility. Its position persists after reload and stays within the screen boundaries. The button remains above the notebook window so it can be pressed again.
+- **0.1.0-beta.3:** styled the Wani Notebook entry as a standard Tavern menu row, with its icon and name on one line and theme-based colors and hover states. It can be opened with a mouse, Enter, or Space.
