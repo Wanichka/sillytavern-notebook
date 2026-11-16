@@ -1,4 +1,4 @@
-# Wani Notebook · 0.1.0
+# Notebook · 0.1.0
 
 A personal notebook for SillyTavern with tabs, individual notes, rich text formatting, and quick copying. Independently implemented by Wanichka, without code from Extension-Notebook.
 
