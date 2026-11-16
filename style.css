@@ -107,6 +107,15 @@
 .wnb-editor-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 0 0 auto; }
 .wnb-editor-footer select { flex: 1; max-width: 220px; }
 .wnb-editor-footer .wnb-hint { margin-left: auto; }
+.wnb-settings-dialog { width: min(520px, calc(100vw - 24px)); }
+.wnb-language-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 4px 0 12px; border-bottom: 1px solid var(--wnb-line);
+}
+.wnb-language-row select { min-width: 120px; }
+.wnb-settings-tabs, .wnb-settings-tab-list { display: grid; gap: 8px; }
+.wnb-settings-tabs h3 { margin: 0; color: var(--wnb-accent); font-size: 1em; }
+.wnb-settings-tabs .wnb-hint { margin: 0; }
 .wnb-tab-row { display: flex; align-items: center; gap: 6px; }
 .wnb-tab-row input { flex: 1; width: 100%; }
 .wnb-copy-field { width: 100%; min-height: 260px; white-space: pre-wrap; }

@@ -3,7 +3,9 @@ const messages = {
     browserCopy: { ru: "Копия в браузере", en: "Browser copy" },
     storageBlocked: { ru: "Браузер запретил локальное сохранение.", en: "The browser blocked local storage." },
     closeNotebook: { ru: "Закрыть блокнот", en: "Close Notebook" },
-    manageTabs: { ru: "Управление вкладками", en: "Manage tabs" },
+    settings: { ru: "Настройки блокнота", en: "Notebook settings" },
+    closeSettings: { ru: "Закрыть настройки", en: "Close settings" },
+    language: { ru: "Язык интерфейса", en: "Interface language" },
     notebookTabs: { ru: "Вкладки блокнота", en: "Notebook tabs" },
     addTab: { ru: "Добавить вкладку", en: "Add tab" },
     searchAll: { ru: "Поиск по всем заметкам…", en: "Search all notes…" },
@@ -100,7 +102,6 @@ const messages = {
     resultCount: { ru: "Найдено: {count}", en: "Results: {count}" },
     confirmDeleteNote: { ru: "Удалить «{title}» навсегда?", en: "Permanently delete “{title}”?" },
     confirmDeleteTab: { ru: "Удалить вкладку «{title}»? Заметки будут перенесены в первую оставшуюся вкладку.", en: "Delete the tab “{title}”? Its notes will move to the first remaining tab." },
-    switchLanguage: { ru: "Switch to English", en: "Переключить на русский" },
     badJson: { ru: "Некорректный JSON.", en: "Invalid JSON." },
     noteTextPlaceholder: { ru: "Текст заметки…", en: "Note text…" },
 };

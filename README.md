@@ -1,4 +1,4 @@
-# Notebook · 0.2.0
+# Notebook · 0.2.1
 
 A personal notebook for SillyTavern with tabs, individual notes, rich text formatting, and quick copying. Independently implemented by Wanichka, without code from Extension-Notebook.
 
@@ -8,7 +8,7 @@ Go to **Extensions → Install extension** and enter `https://github.com/Wanichk
 
 Open **Notebook** from the extensions menu or the round floating button with a book icon. Press the floating button again to close the window. You can drag the button with a mouse or your finger; its position is saved separately for each Tavern user in this browser. If Roleplay Tools 0.1.0 is installed, the notebook automatically appears on its **Notebook** (`Блокнот`) page, and the standalone button is hidden. You can move it to another section in the Roleplay Tools settings. Other extensions do not need to be updated for this integration.
 
-Click **EN** in the Notebook header to switch to English, or **RU** to switch back. The choice is saved per Tavern user in the current browser. Note contents and existing tab names stay as written.
+Open **Notebook settings** using the sliders button in the header and choose **English** or **Русский** under **Interface language**. The choice is saved per Tavern user in the current browser. Note contents and existing tab names stay as written.
 
 ## Features
 
@@ -34,7 +34,7 @@ Export a backup periodically: clearing browser data removes local copies, and re
 
 ## Testing
 
-The browser test suite is in `tests/browser.mjs`. The recorded results include 53 passing checks covering interface language switching, persistence after reload, exact copying of injection text, colors, search, trash, import/export, conflicts between two browser tabs, and local storage failures. The pinned add-tab button was also checked for visibility and interaction while scrolling tabs, in a narrow window, and with the keyboard. The tests use the actual Notebook and Roleplay Tools code, with a test harness standing in for Tavern settings and the Tavern user. The harness does not run the Tavern server or actual model generation.
+The browser test suite is in `tests/browser.mjs`. The recorded results include 55 passing checks covering interface language switching, persistence after reload, exact copying of injection text, colors, search, trash, import/export, conflicts between two browser tabs, and local storage failures. The pinned add-tab button was also checked for visibility and interaction while scrolling tabs, in a narrow window, and with the keyboard. The tests use the actual Notebook and Roleplay Tools code, with a test harness standing in for Tavern settings and the Tavern user. The harness does not run the Tavern server or actual model generation.
 
 ```sh
 npm install --no-save playwright
@@ -54,6 +54,7 @@ ST_PUBLIC_DIR=/path/to/SillyTavern/public RPT_HOST_DIR=../roleplay-tools node te
 
 ## Version history
 
+- **0.2.1:** moves the language selector to Notebook settings, above the tab controls.
 - **0.2.0:** adds English and Russian interface options and shortens the display name to Notebook. Existing notes and version 1 backups work with this update.
 - **0.1.0:** removes the beta designation after regular use in a live Tavern; the README is now in English.
 - **0.1.0-beta.4:** introduced a round 44×44 floating button in the style of Story Notes. It can be dragged with a mouse or finger. Pressing it again closes the window; dragging does not toggle visibility. Its position persists after reload and stays within the screen boundaries. The button remains above the notebook window so it can be pressed again.

@@ -110,7 +110,16 @@ try {
 
     // Switching the interface language must not rewrite user data or open tabs.
     const beforeLanguageSwitch = await getData();
-    await page.getByRole('button', { name: 'Switch to English' }).click();
+    const notebook = page.locator('#wnb-panel');
+    check(await notebook.getByRole('combobox').count() === 0 &&
+        !await notebook.getByRole('button', { name: 'Switch to English' }).count(), 'language control stays out of the Notebook panel');
+    await notebook.getByRole('button', { name: 'Настройки блокнота' }).click();
+    const settings = page.getByRole('dialog', { name: 'Настройки блокнота' });
+    await settings.getByRole('combobox', { name: 'Язык интерфейса' }).selectOption('en');
+    const englishSettings = page.getByRole('dialog', { name: 'Notebook settings' });
+    check(await englishSettings.getByRole('combobox', { name: 'Interface language' }).inputValue() === 'en' &&
+        await englishSettings.getByRole('heading', { name: 'Notebook tabs' }).isVisible(), 'settings stay open and switch languages in place');
+    await englishSettings.getByRole('button', { name: 'Close settings' }).click();
     check(await page.getByRole('button', { name: 'Add note', exact: true }).isVisible() &&
         await page.getByRole('searchbox', { name: 'Search all notes' }).isVisible() &&
         await page.getByRole('button', { name: 'Export notebook' }).isVisible(), 'English panel controls');
@@ -121,9 +130,12 @@ try {
         await page.getByRole('button', { name: 'Bold', exact: true }).isVisible(), 'English editor preserves a Russian note title');
     await page.getByRole('button', { name: 'Done', exact: true }).click();
     await open();
-    check(await page.getByRole('button', { name: 'Переключить на русский' }).isVisible(), 'English choice survives reload');
+    await notebook.getByRole('button', { name: 'Notebook settings' }).click();
+    const languageSelect = englishSettings.getByRole('combobox', { name: 'Interface language' });
+    check(await languageSelect.inputValue() === 'en', 'English choice survives reload');
     assert.deepEqual(await getData(), beforeLanguageSwitch);
-    await page.getByRole('button', { name: 'Переключить на русский' }).click();
+    await languageSelect.selectOption('ru');
+    await settings.getByRole('button', { name: 'Закрыть настройки' }).click();
     check(await page.getByRole('button', { name: 'Добавить заметку', exact: true }).isVisible(), 'returns to Russian');
     await card('summary').getByRole('button', { name: 'Копировать текст заметки' }).click();
     check(await page.evaluate(() => copied) === '<roleplay_summary>\n{{summary}}\n</roleplay_summary>', 'copy preserves literal tags, macros and line breaks, excludes title');
@@ -200,10 +212,10 @@ try {
     check(sanitized.rejected, 'duplicate backup identifiers rejected');
     check(!await page.evaluate(()=>injected), 'imported HTML cannot execute');
 
-    await page.getByRole('button', { name: 'Управление вкладками', exact: true }).click();
+    await page.getByRole('button', { name: 'Настройки блокнота', exact: true }).click();
     await page.getByRole('textbox', { name: 'Название вкладки', exact: true }).first().fill('Мои команды');
     await page.getByRole('button', { name: 'Передвинуть вкладку вправо', exact: true }).first().click();
-    await page.getByRole('button', { name: 'Закрыть редактор', exact: true }).click();
+    await page.getByRole('button', { name: 'Закрыть настройки', exact: true }).click();
     check((await getData()).tabs[1].title==='Мои команды', 'tab rename and reordering');
     const sameData=await getData();
     await page.evaluate(()=>WaniRoleplayTools.destroy());
@@ -236,10 +248,10 @@ try {
     await page.getByRole('button',{name:'Заменить блокнот',exact:true}).click();
     const oldCopy=JSON.parse(await readFile(await (await oldCopyEvent).path(),'utf8'));
     check(oldCopy.notes.some(n=>n.title==='Без сервера') && (await getData()).notes.length===seed.notes.length,'replace import backs up old content before replacing');
-    await page.getByRole('button',{name:'Управление вкладками',exact:true}).click();
+    await page.getByRole('button',{name:'Настройки блокнота',exact:true}).click();
     page.once('dialog',d=>d.accept());
     await page.getByRole('button',{name:'Удалить вкладку',exact:true}).nth(1).click();
-    await page.getByRole('button',{name:'Закрыть редактор',exact:true}).click();
+    await page.getByRole('button',{name:'Закрыть настройки',exact:true}).click();
     check((await getData()).notes.find(n=>n.id==='crew').tabId==='commands','deleting a tab moves its notes instead of deleting them');
 
     // Clipboard denial uses the synchronous browser fallback, still with plain text.

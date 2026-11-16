@@ -55,9 +55,8 @@ header.append(make('strong', 'wnb-brand', '✦ Notebook'));
 const controls = make('div', 'wnb-actions');
 const closeButton = button(t('closeNotebook'), 'xmark', closePanel);
 closeButton.classList.add('wnb-standalone');
-const manageTabsButton = button(t('manageTabs'), 'sliders', manageTabs);
-const languageButton = button(t('switchLanguage'), '', switchLanguage);
-controls.append(languageButton, manageTabsButton, closeButton); header.append(controls);
+const settingsButton = button(t('settings'), 'sliders', openSettings);
+controls.append(settingsButton, closeButton); header.append(controls);
 const tabs = make('nav', 'wnb-tabs'); tabs.setAttribute('aria-label', t('notebookTabs')); tabs.setAttribute('role', 'tablist');
 const tabsRow = make('div', 'wnb-tabs-row');
 const addTabButton = button(t('addTab'), 'plus', addTab); addTabButton.classList.add('wnb-add-tab');
@@ -124,11 +123,7 @@ if (menu) {
 
 function applyLanguage() {
     panel.lang = language;
-    const nextLanguage = language === 'ru' ? 'en' : 'ru';
-    languageButton.lang = nextLanguage;
-    languageButton.textContent = nextLanguage.toUpperCase();
-    setLabel(languageButton, t('switchLanguage'));
-    setLabel(manageTabsButton, t('manageTabs'));
+    setLabel(settingsButton, t('settings'));
     setLabel(closeButton, t('closeNotebook'));
     tabs.setAttribute('aria-label', t('notebookTabs'));
     setLabel(addTabButton, t('addTab'));
@@ -146,8 +141,8 @@ function applyLanguage() {
     render();
 }
 
-function switchLanguage() {
-    language = language === 'ru' ? 'en' : 'ru';
+function setLanguage(value) {
+    language = value;
     try { localStorage.setItem(languageKey, language); }
     catch { /* still switch for this page */ }
     applyLanguage();
@@ -278,15 +273,18 @@ async function copyNote(note) {
 }
 function modal(title) {
     const dialog = make('dialog', 'wnb-dialog'); dialog.lang = language; const heading = make('header', 'wnb-dialog-header');
-    heading.append(make('strong', 'wnb-brand', title)); const actions = make('div', 'wnb-actions');
+    const titleNode = make('strong', 'wnb-brand', title);
+    const actions = make('div', 'wnb-actions');
     const finish = () => { dialog.close(); render(); };
-    actions.append(button(t('closeEditor'), 'xmark', finish)); heading.append(actions);
+    const closeControl = button(t('closeEditor'), 'xmark', finish);
+    actions.append(closeControl);
+    heading.append(titleNode, actions);
     const body = make('div', 'wnb-dialog-body'); dialog.append(heading, body); document.body.append(dialog);
     dialog.addEventListener('close', () => { dialog.remove(); render(); });
     // Tavern keyboard shortcuts must not submit a message while typing a note.
     dialog.addEventListener('keydown', event => event.stopPropagation());
     dialog.addEventListener('keyup', event => event.stopPropagation());
-    return { dialog, body, actions, finish };
+    return { dialog, body, actions, finish, titleNode, closeControl };
 }
 function addNote() {
     if (data.notes.length + data.trash.length >= 10000) { notify(t('noteLimit'), true); return; }
@@ -347,27 +345,65 @@ function editNote(note) {
     }), saved, button(t('done'), 'check', finish, t('done')));
     body.append(title, toolbar, editor, bottom); dialog.showModal(); (note.title ? editor : title).focus();
 }
-function manageTabs() {
-    const { dialog, body } = modal(t('notebookTabs'));
-    function draw() {
-        body.replaceChildren(make('p', 'wnb-hint', t('organizeTabsHint')));
+function openSettings() {
+    const { dialog, body, titleNode, closeControl } = modal(t('settings'));
+    dialog.classList.add('wnb-settings-dialog');
+    titleNode.id = 'wnb-settings-title';
+    dialog.setAttribute('aria-labelledby', titleNode.id);
+
+    const languageRow = make('label', 'wnb-language-row');
+    const languageLabel = make('span');
+    const languageSelect = make('select');
+    for (const [value, name] of [['ru', 'Русский'], ['en', 'English']]) {
+        const option = make('option', '', name);
+        option.value = value;
+        option.lang = value;
+        languageSelect.append(option);
+    }
+    languageSelect.value = language;
+    languageRow.append(languageLabel, languageSelect);
+
+    const tabSection = make('section', 'wnb-settings-tabs');
+    const tabHeading = make('h3');
+    const tabHint = make('p', 'wnb-hint');
+    const tabList = make('div', 'wnb-settings-tab-list');
+    tabSection.append(tabHeading, tabHint, tabList);
+    body.append(languageRow, tabSection);
+
+    function renderSettings() {
+        dialog.lang = language;
+        titleNode.textContent = t('settings');
+        setLabel(closeControl, t('closeSettings'));
+        languageLabel.textContent = t('language');
+        tabHeading.textContent = t('notebookTabs');
+        tabHint.textContent = t('organizeTabsHint');
+        renderTabRows();
+    }
+
+    function renderTabRows() {
+        tabList.replaceChildren();
         data.tabs.forEach((tab, index) => {
             const row = make('div', 'wnb-tab-row'); const name = make('input'); name.value = tab.title; name.maxLength = 200; name.setAttribute('aria-label', t('tabTitle'));
             name.addEventListener('input', () => { tab.title = name.value; changed(); renderTabs(); });
             row.append(name);
             for (const [delta, label, icon] of [[-1, t('tabLeft'), 'arrow-left'], [1, t('tabRight'), 'arrow-right']]) {
-                const b = button(label, icon, () => { [data.tabs[index], data.tabs[index + delta]] = [data.tabs[index + delta], tab]; changed(); draw(); renderTabs(); });
+                const b = button(label, icon, () => { [data.tabs[index], data.tabs[index + delta]] = [data.tabs[index + delta], tab]; changed(); renderTabRows(); renderTabs(); });
                 b.disabled = !data.tabs[index + delta]; row.append(b);
             }
             const remove = button(t('deleteTab'), 'trash-can', () => {
                 if (!confirm(t('confirmDeleteTab', { title: tab.title }))) return;
                 data.tabs = data.tabs.filter(t => t.id !== tab.id);
                 for (const note of [...data.notes, ...data.trash]) if (note.tabId === tab.id) note.tabId = data.tabs[0].id;
-                changed(); draw(); render();
-            }); remove.disabled = data.tabs.length === 1; row.append(remove); body.append(row);
+                changed(); renderTabRows(); render();
+            }); remove.disabled = data.tabs.length === 1; row.append(remove); tabList.append(row);
         });
     }
-    draw(); dialog.showModal();
+    languageSelect.addEventListener('change', () => {
+        setLanguage(languageSelect.value);
+        renderSettings();
+    });
+    renderSettings();
+    dialog.showModal();
 }
 function openPanel() {
     if (panel.dataset.rptDocked === 'true' && window.WaniRoleplayTools?.open('notebook')) return;
