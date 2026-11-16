@@ -49,7 +49,7 @@ const server = createServer(async (req, res) => {
             res.setHeader('Content-Type', url.pathname.endsWith('css')?'text/css':'font/woff2');
             res.end(await readFile(path.join(stPublic,url.pathname))); return;
         }
-        const match = url.pathname.match(/^\/scripts\/extensions\/third-party\/(notebook|host)\/(index\.js|style\.css|model\.js)$/);
+        const match = url.pathname.match(/^\/scripts\/extensions\/third-party\/(notebook|host)\/(index\.js|style\.css|model\.js|i18n\.js)$/);
         if (!match) { res.writeHead(404); res.end(); return; }
         res.setHeader('Content-Type', match[2].endsWith('css') ? 'text/css' : 'text/javascript');
         res.end(await readFile(path.join(match[1] === 'host' ? host : root, match[2])));
@@ -107,6 +107,24 @@ try {
     await page.setViewportSize({width:1400,height:950});await open();
     check(await page.locator('#wnb-panel').getAttribute('data-rpt-docked') === 'true', 'host-first registers Notebook');
     check(await page.locator('#rpt-shell').getByRole('tab', { name: 'Блокнот', exact: true }).isVisible(), 'own default host page');
+
+    // Switching the interface language must not rewrite user data or open tabs.
+    const beforeLanguageSwitch = await getData();
+    await page.getByRole('button', { name: 'Switch to English' }).click();
+    check(await page.getByRole('button', { name: 'Add note', exact: true }).isVisible() &&
+        await page.getByRole('searchbox', { name: 'Search all notes' }).isVisible() &&
+        await page.getByRole('button', { name: 'Export notebook' }).isVisible(), 'English panel controls');
+    assert.deepEqual(await getData(), beforeLanguageSwitch);
+    const original = card('summary');
+    await original.getByRole('button', { name: 'Edit note' }).click();
+    check(await page.getByRole('textbox', { name: 'Note title' }).inputValue() === 'Инжект для пересказа' &&
+        await page.getByRole('button', { name: 'Bold', exact: true }).isVisible(), 'English editor preserves a Russian note title');
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await open();
+    check(await page.getByRole('button', { name: 'Переключить на русский' }).isVisible(), 'English choice survives reload');
+    assert.deepEqual(await getData(), beforeLanguageSwitch);
+    await page.getByRole('button', { name: 'Переключить на русский' }).click();
+    check(await page.getByRole('button', { name: 'Добавить заметку', exact: true }).isVisible(), 'returns to Russian');
     await card('summary').getByRole('button', { name: 'Копировать текст заметки' }).click();
     check(await page.evaluate(() => copied) === '<roleplay_summary>\n{{summary}}\n</roleplay_summary>', 'copy preserves literal tags, macros and line breaks, excludes title');
     await card('summary').getByRole('button', { name: 'Свернуть заметку' }).click();

@@ -30,7 +30,7 @@ const server = createServer(async(req,res)=>{
         const url = new URL(req.url,'http://localhost');
         if(url.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(html(url.searchParams.has('host')));return;}
         if(url.pathname==='/scripts/user.js'){res.setHeader('Content-Type','text/javascript');res.end('export const getCurrentUserHandle=()=>"menu-test";');return;}
-        const match=url.pathname.match(/^\/scripts\/extensions\/third-party\/(host|notebook)\/(index\.js|model\.js|style\.css)$/);
+        const match=url.pathname.match(/^\/scripts\/extensions\/third-party\/(host|notebook)\/(index\.js|model\.js|style\.css|i18n\.js)$/);
         let file;
         if(match)file=path.join(match[1]==='host'?host:root,match[2]);
         else {
@@ -51,6 +51,7 @@ try {
         await page.goto(`http://127.0.0.1:${server.address().port}/${hosted?'?host':''}`);await page.waitForFunction(()=>window.ready);
         await page.evaluate(()=>document.fonts.ready);
         const menu=page.locator('#wnb-menu-button');
+        check(await menu.textContent() === 'Notebook', `${mode}: menu uses the Notebook display name`);
         const style=await menu.evaluate(el=>{
             const read=node=>{const s=getComputedStyle(node),r=node.getBoundingClientRect();return {color:s.color,background:s.backgroundColor,border:s.borderTopWidth,display:s.display,height:r.height,opacity:s.opacity}};
             const i=el.querySelector('i').getBoundingClientRect(),label=el.querySelector('span').getBoundingClientRect();

@@ -1,9 +1,10 @@
-// Original Wani Notebook implementation. No code from Extension-Notebook.
+import { translate } from './i18n.js';
+
 export const KEY = 'wani_notebook_v1';
 export const uid = () => crypto.randomUUID();
-export function emptyNotebook() {
+export function emptyNotebook(title = translate('ru', 'notes')) {
     return { format: 'wani-notebook', version: 1, updatedAt: 0,
-        tabs: [{ id: uid(), title: 'Заметки' }], notes: [], trash: [] };
+        tabs: [{ id: uid(), title }], notes: [], trash: [] };
 }
 
 const allowed = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE', 'SPAN', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'H1', 'H2', 'H3', 'FONT']);
@@ -58,24 +59,24 @@ export function plainText(html) {
 }
 
 // Strict, atomic validation: a bad backup never replaces the current notebook.
-export function validateNotebook(value) {
-    if (!value || value.format !== 'wani-notebook' || value.version !== 1) throw new Error('Это не резервная копия Wani Notebook версии 1.');
+export function validateNotebook(value, t = key => translate('ru', key)) {
+    if (!value || value.format !== 'wani-notebook' || value.version !== 1) throw new Error(t('badFormat'));
     if (!Array.isArray(value.tabs) || !value.tabs.length || value.tabs.length > 100 ||
-        !Array.isArray(value.notes) || !Array.isArray(value.trash) || value.notes.length + value.trash.length > 10000) throw new Error('Некорректный список вкладок или заметок.');
+        !Array.isArray(value.notes) || !Array.isArray(value.trash) || value.notes.length + value.trash.length > 10000) throw new Error(t('badLists'));
     const ids = new Set();
     function id(value) {
-        if (typeof value !== 'string' || !value || value.length > 100 || ids.has(value)) throw new Error('Некорректные или повторяющиеся идентификаторы.');
+        if (typeof value !== 'string' || !value || value.length > 100 || ids.has(value)) throw new Error(t('badIds'));
         ids.add(value); return value;
     }
     function title(value) {
-        if (typeof value !== 'string' || value.length > 200) throw new Error('Некорректный заголовок.');
+        if (typeof value !== 'string' || value.length > 200) throw new Error(t('badTitle'));
         return value;
     }
-    const tabs = value.tabs.map(tab => ({ id: id(tab.id), title: title(tab.title) }));
+    const tabs = value.tabs.map(tab => ({ id: id(tab?.id), title: title(tab.title) }));
     const tabIds = new Set(tabs.map(tab => tab.id));
     const note = (item, trash = false) => {
-        if (typeof item.html !== 'string' || item.html.length > 2000000) throw new Error('Некорректный или слишком большой текст заметки.');
-        if (!trash && !tabIds.has(item.tabId)) throw new Error('У заметки отсутствует вкладка.');
+        if (typeof item?.html !== 'string' || item.html.length > 2000000) throw new Error(t('badNote'));
+        if (!trash && !tabIds.has(item.tabId)) throw new Error(t('missingTab'));
         return { id: id(item.id), tabId: tabIds.has(item.tabId) ? item.tabId : tabs[0].id,
             title: title(item.title), html: sanitize(item.html), collapsed: Boolean(item.collapsed),
             ...(trash ? { deletedAt: Number(item.deletedAt) || 0 } : {}) };

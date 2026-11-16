@@ -1,20 +1,36 @@
 import { getCurrentUserHandle } from '../../../user.js';
 import { KEY, uid, emptyNotebook, sanitize, plainText, validateNotebook, mergeNotebook } from './model.js';
+import { translate } from './i18n.js';
 
 const context = SillyTavern.getContext();
 const backupKey = `${KEY}:${getCurrentUserHandle()}`;
-let data = emptyNotebook(), activeTab, query = '', showTrash = false, dirty = false, clock = 0;
+const languageKey = `${backupKey}:language`;
+let language = 'ru';
+try {
+    if (localStorage.getItem(languageKey) === 'en') language = 'en';
+} catch { /* keep the default when storage is unavailable */ }
+
+const t = (key, values) => translate(language, key, values);
+function parseNotebook(value) {
+    if (typeof value === 'string') {
+        try { value = JSON.parse(value); }
+        catch { throw new Error(t('badJson')); }
+    }
+    return validateNotebook(value, t);
+}
+
+let data = emptyNotebook(t('notes')), activeTab, query = '', showTrash = false, dirty = false, clock = 0;
 let remoteConflict = false, storageBroken = false;
 const startupErrors = [];
 function readState(value, label) {
     if (!value) return null;
-    try { return validateNotebook(typeof value === 'string' ? JSON.parse(value) : value); }
+    try { return parseNotebook(value); }
     catch (error) { startupErrors.push(`${label}: ${error.message}`); return null; }
 }
-const serverData = readState(context.extensionSettings[KEY], 'Настройки Tavern');
+const serverData = readState(context.extensionSettings[KEY], t('tavernSettings'));
 let browserData = null;
-try { browserData = readState(localStorage.getItem(backupKey), 'Копия в браузере'); }
-catch (error) { storageBroken = true; startupErrors.push('Браузер запретил локальное сохранение.'); }
+try { browserData = readState(localStorage.getItem(backupKey), t('browserCopy')); }
+catch (error) { storageBroken = true; startupErrors.push(t('storageBlocked')); }
 data = browserData && (!serverData || browserData.updatedAt > serverData.updatedAt) ? browserData : serverData || data;
 activeTab = data.tabs[0].id;
 clock = data.updatedAt;
@@ -22,76 +38,119 @@ clock = data.updatedAt;
 const make = (tag, cls = '', text = '') => {
     const node = document.createElement(tag); node.className = cls; node.textContent = text; return node;
 };
+function setLabel(node, label) {
+    node.title = label;
+    node.setAttribute('aria-label', label);
+}
 function button(label, icon, handler, text = '') {
-    const node = make('button', 'wnb-button'); node.type = 'button'; node.title = label; node.setAttribute('aria-label', label);
+    const node = make('button', 'wnb-button'); node.type = 'button'; setLabel(node, label);
     if (icon) { const i = make('i', `fa-solid fa-${icon}`); i.setAttribute('aria-hidden', 'true'); node.append(i); }
     if (text) node.append(document.createTextNode(text));
     node.addEventListener('click', handler); return node;
 }
-const panel = make('section'); panel.id = 'wnb-panel'; panel.setAttribute('aria-label', 'Wani Notebook');
+const panel = make('section'); panel.id = 'wnb-panel'; panel.setAttribute('aria-label', 'Notebook');
 panel.style.display = 'none';
 const header = make('header', 'wnb-header');
 header.append(make('strong', 'wnb-brand', '✦ Notebook'));
 const controls = make('div', 'wnb-actions');
-const closeButton = button('Закрыть блокнот', 'xmark', closePanel);
+const closeButton = button(t('closeNotebook'), 'xmark', closePanel);
 closeButton.classList.add('wnb-standalone');
-controls.append(button('Управление вкладками', 'sliders', manageTabs), closeButton); header.append(controls);
-const tabs = make('nav', 'wnb-tabs'); tabs.setAttribute('aria-label', 'Вкладки блокнота'); tabs.setAttribute('role', 'tablist');
+const manageTabsButton = button(t('manageTabs'), 'sliders', manageTabs);
+const languageButton = button(t('switchLanguage'), '', switchLanguage);
+controls.append(languageButton, manageTabsButton, closeButton); header.append(controls);
+const tabs = make('nav', 'wnb-tabs'); tabs.setAttribute('aria-label', t('notebookTabs')); tabs.setAttribute('role', 'tablist');
 const tabsRow = make('div', 'wnb-tabs-row');
-const addTabButton = button('Добавить вкладку', 'plus', addTab); addTabButton.classList.add('wnb-add-tab');
+const addTabButton = button(t('addTab'), 'plus', addTab); addTabButton.classList.add('wnb-add-tab');
 tabsRow.append(tabs, addTabButton);
 const tools = make('div', 'wnb-tools');
-const search = make('input'); search.type = 'search'; search.placeholder = 'Поиск по всем заметкам…'; search.setAttribute('aria-label', 'Поиск по всем заметкам');
+const search = make('input'); search.type = 'search'; search.placeholder = t('searchAll'); search.setAttribute('aria-label', t('searchAllLabel'));
 search.addEventListener('input', () => { query = search.value.trim().toLocaleLowerCase(); renderNotes(); });
-const newButton = button('Добавить заметку', 'plus', addNote, 'Заметка');
+const newButton = button(t('addNote'), 'plus', addNote, t('note'));
 tools.append(search, newButton);
 const list = make('div', 'wnb-list'); list.id = 'wnb-notes'; list.setAttribute('role', 'tabpanel');
 const footer = make('footer', 'wnb-footer');
-const status = make('span', 'wnb-status', 'Сохранено'); status.setAttribute('role', 'status');
-status.title = 'Локальная копия в этом браузере. Синхронизация с настройками Tavern выполняется отдельно.';
-const trashButton = button('Корзина', 'trash-can', () => { showTrash = !showTrash; render(); });
-footer.append(status, button('Экспорт блокнота', 'download', () => download()), button('Импорт блокнота', 'upload', () => fileInput.click()), trashButton);
+let statusKey = 'saved';
+const status = make('span', 'wnb-status', t(statusKey)); status.setAttribute('role', 'status');
+function setStatus(key) { statusKey = key; status.textContent = t(key); }
+status.title = t('saveHint');
+const trashButton = button(t('trash'), 'trash-can', () => { showTrash = !showTrash; render(); });
+const exportButton = button(t('exportNotebook'), 'download', () => download());
+const importButton = button(t('importNotebook'), 'upload', () => fileInput.click());
+footer.append(status, exportButton, importButton, trashButton);
 const fileInput = make('input'); fileInput.type = 'file'; fileInput.accept = '.json,application/json'; fileInput.hidden = true;
 fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0]; fileInput.value = ''; if (!file) return;
     try {
-        if (file.size > 5 * 1024 * 1024) throw new Error('Максимальный размер файла — 5 МБ.');
-        const imported = validateNotebook(JSON.parse(await file.text()));
-        const { dialog, body, finish } = modal('Импорт блокнота');
-        body.append(make('p', '', `Вкладок: ${imported.tabs.length}. Заметок: ${imported.notes.length}. В корзине: ${imported.trash.length}.`));
-        body.append(make('p', '', 'Добавление создаст отдельные вкладки. Перед заменой будет скачана копия текущего блокнота.'));
-        body.append(button('Добавить к моим заметкам', 'plus', () => {
-            try { data = validateNotebook(mergeNotebook(data, imported)); activeTab = data.tabs[0].id; showTrash = false; changed(); render(); finish(); }
+        if (file.size > 5 * 1024 * 1024) throw new Error(t('fileTooLarge'));
+        const imported = parseNotebook(await file.text());
+        const { dialog, body, finish } = modal(t('importNotebook'));
+        body.append(make('p', '', t('importCounts', { tabs: imported.tabs.length, notes: imported.notes.length, trash: imported.trash.length })));
+        body.append(make('p', '', t('importHint')));
+        body.append(button(t('addToNotes'), 'plus', () => {
+            try { data = parseNotebook(mergeNotebook(data, imported)); activeTab = data.tabs[0].id; showTrash = false; changed(); render(); finish(); }
             catch (error) { notify(error.message, true); }
-        }, 'Добавить'));
-        body.append(button('Заменить блокнот', 'rotate', () => {
-            if (!confirm('Заменить весь блокнот, включая корзину? Текущая копия будет скачана перед заменой.')) return;
+        }, t('add')));
+        body.append(button(t('replaceNotebook'), 'rotate', () => {
+            if (!confirm(t('confirmReplace'))) return;
             download(); data = imported; activeTab = data.tabs[0].id; showTrash = false; changed(); render(); finish();
-        }, 'Заменить'));
+        }, t('replace')));
         dialog.showModal();
     } catch (error) { notify(error.message, true); }
 });
 panel.append(header, tabsRow, tools, list, footer, fileInput);
-const launcher = button('Открыть Wani Notebook', 'book-open', togglePanel); launcher.id = 'wnb-launcher';
+const launcher = button(t('openNotebook'), 'book-open', togglePanel); launcher.id = 'wnb-launcher';
 launcher.setAttribute('aria-controls', panel.id); launcher.setAttribute('aria-expanded', 'false');
 document.body.append(panel, launcher);
 const fitLauncher = setupLauncherDrag();
 updateLauncherState();
 const menu = document.getElementById('extensionsMenu');
+let menuItem;
 if (menu) {
     // Tavern styles its menu rows as divs with an icon and a text span.
     // The panel button helper is intentionally scoped to the panel/dialogs.
     const item = make('div', 'list-group-item flex-container flexGap5 interactable');
     item.id = 'wnb-menu-button'; item.tabIndex = 0; item.setAttribute('role', 'button');
-    item.setAttribute('aria-label', 'Открыть Wani Notebook');
+    item.setAttribute('aria-label', t('openNotebook'));
     const icon = make('i', 'fa-solid fa-book-open extensionsMenuExtensionButton'); icon.setAttribute('aria-hidden', 'true');
-    item.append(icon, make('span', '', 'Wani Notebook'));
+    item.append(icon, make('span', '', 'Notebook'));
     item.addEventListener('click', openPanel);
     item.addEventListener('keydown', event => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault(); event.stopPropagation(); item.click();
     });
+    menuItem = item;
     menu.append(item);
+}
+
+function applyLanguage() {
+    panel.lang = language;
+    const nextLanguage = language === 'ru' ? 'en' : 'ru';
+    languageButton.lang = nextLanguage;
+    languageButton.textContent = nextLanguage.toUpperCase();
+    setLabel(languageButton, t('switchLanguage'));
+    setLabel(manageTabsButton, t('manageTabs'));
+    setLabel(closeButton, t('closeNotebook'));
+    tabs.setAttribute('aria-label', t('notebookTabs'));
+    setLabel(addTabButton, t('addTab'));
+    search.placeholder = t('searchAll');
+    search.setAttribute('aria-label', t('searchAllLabel'));
+    setLabel(newButton, t('addNote'));
+    newButton.lastChild.textContent = t('note');
+    setStatus(statusKey);
+    status.title = t('saveHint');
+    setLabel(exportButton, t('exportNotebook'));
+    setLabel(importButton, t('importNotebook'));
+    trashButton.setAttribute('aria-label', t('trash'));
+    menuItem?.setAttribute('aria-label', t('openNotebook'));
+    updateLauncherState();
+    render();
+}
+
+function switchLanguage() {
+    language = language === 'ru' ? 'en' : 'ru';
+    try { localStorage.setItem(languageKey, language); }
+    catch { /* still switch for this page */ }
+    applyLanguage();
 }
 
 function notify(message, error = false) {
@@ -103,14 +162,14 @@ function changed() {
     save();
 }
 function save() {
-    if (remoteConflict) { status.textContent = 'Конфликт вкладок'; return; }
+    if (remoteConflict) { setStatus('tabConflict'); return; }
     try {
         localStorage.setItem(backupKey, JSON.stringify(data));
-        storageBroken = false; dirty = false; status.textContent = 'Сохранено';
-    } catch (error) { storageBroken = true; status.textContent = 'Не сохранено локально'; }
+        storageBroken = false; dirty = false; setStatus('saved');
+    } catch (error) { storageBroken = true; setStatus('notSaved'); }
     context.extensionSettings[KEY] = structuredClone(data);
     try { context.saveSettingsDebounced(); }
-    catch (error) { status.textContent = 'Нет синхронизации'; }
+    catch (error) { setStatus('notSynced'); }
 }
 window.addEventListener('beforeunload', event => {
     if (dirty || storageBroken || remoteConflict) { event.preventDefault(); event.returnValue = ''; }
@@ -119,28 +178,28 @@ window.addEventListener('beforeunload', event => {
 window.addEventListener('storage', event => {
     if (event.key !== backupKey || !event.newValue) return;
     try {
-        const incoming = validateNotebook(JSON.parse(event.newValue));
+        const incoming = parseNotebook(event.newValue);
         if (incoming.updatedAt <= data.updatedAt) return;
         if (document.querySelector('dialog.wnb-dialog[open]') || dirty) {
-            remoteConflict = true; status.textContent = 'Изменено в другой вкладке';
-            notify('Блокнот изменён в другой вкладке браузера. Закрой редактор и нажми на статус сохранения, чтобы выбрать копию.', true);
+            remoteConflict = true; setStatus('changedElsewhere');
+            notify(t('conflictHint'), true);
         } else { data = incoming; clock = data.updatedAt; context.extensionSettings[KEY] = structuredClone(data); render(); }
-    } catch (error) { notify('Не удалось прочитать изменения из другой вкладки.', true); }
+    } catch (error) { notify(t('cannotReadChanges'), true); }
 });
 status.tabIndex = 0;
 function resolveConflict() {
-    if (!remoteConflict) { if (storageBroken) { save(); if (storageBroken) notify('Локальная копия не записывается. Экспортируй блокнот в файл.', true); } return; }
-    if (document.querySelector('dialog.wnb-dialog[open]')) { notify('Сначала закрой редактор.'); return; }
-    const { dialog, body, finish } = modal('Две копии блокнота');
-    body.append(make('p', '', 'Выбери, какую копию оставить. Другая копия будет скачана в файл.'));
-    body.append(button('Загрузить изменения из другой вкладки', '', () => {
-        try { const incoming = validateNotebook(JSON.parse(localStorage.getItem(backupKey))); download(); data = incoming; remoteConflict = false; changed(); render(); finish(); }
+    if (!remoteConflict) { if (storageBroken) { save(); if (storageBroken) notify(t('exportOnFailure'), true); } return; }
+    if (document.querySelector('dialog.wnb-dialog[open]')) { notify(t('closeEditorFirst')); return; }
+    const { dialog, body, finish } = modal(t('twoCopies'));
+    body.append(make('p', '', t('chooseCopy')));
+    body.append(button(t('loadOtherCopy'), '', () => {
+        try { const incoming = parseNotebook(localStorage.getItem(backupKey)); download(); data = incoming; remoteConflict = false; changed(); render(); finish(); }
         catch (error) { notify(error.message, true); }
-    }, 'Использовать другую вкладку'));
-    body.append(button('Сохранить мои изменения', '', () => {
-        try { const incoming = validateNotebook(JSON.parse(localStorage.getItem(backupKey))); download(incoming); clock = Math.max(clock, incoming.updatedAt); remoteConflict = false; changed(); finish(); }
+    }, t('useOtherTab')));
+    body.append(button(t('saveMyChanges'), '', () => {
+        try { const incoming = parseNotebook(localStorage.getItem(backupKey)); download(incoming); clock = Math.max(clock, incoming.updatedAt); remoteConflict = false; changed(); finish(); }
         catch (error) { notify(error.message, true); }
-    }, 'Оставить мои изменения'));
+    }, t('keepMyChanges')));
     dialog.showModal();
 }
 status.addEventListener('click', resolveConflict);
@@ -148,22 +207,22 @@ status.addEventListener('keydown', event => { if (event.key === 'Enter') resolve
 function download(value = data) {
     const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob), a = make('a'); a.href = url;
-    a.download = `wani-notebook-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    a.download = `notebook-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 function renderTabs() {
     if (!data.tabs.some(tab => tab.id === activeTab)) activeTab = data.tabs[0].id;
     tabs.replaceChildren();
     for (const tab of data.tabs) {
-        const b = button(tab.title || 'Без названия', '', () => { activeTab = tab.id; showTrash = false; query = ''; search.value = ''; render(); }, tab.title || 'Без названия');
+        const b = button(tab.title || t('untitled'), '', () => { activeTab = tab.id; showTrash = false; query = ''; search.value = ''; render(); }, tab.title || t('untitled'));
         b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(tab.id === activeTab && !showTrash)); b.setAttribute('aria-controls', list.id);
         tabs.append(b);
     }
 }
 function addTab() {
-    const title = prompt('Название новой вкладки', 'Новая вкладка'); if (title === null) return;
-    if (data.tabs.length >= 100) { notify('Достигнут предел: 100 вкладок.', true); return; }
-    const tab = { id: uid(), title: title.trim().slice(0, 200) || 'Новая вкладка' };
+    const title = prompt(t('newTabTitle'), t('newTab')); if (title === null) return;
+    if (data.tabs.length >= 100) { notify(t('tabLimit'), true); return; }
+    const tab = { id: uid(), title: title.trim().slice(0, 200) || t('newTab') };
     data.tabs.push(tab); activeTab = tab.id; showTrash = false; query = ''; search.value = '';
     changed(); render(); tabs.scrollLeft = tabs.scrollWidth;
 }
@@ -171,34 +230,34 @@ function render() { renderTabs(); renderNotes(); }
 function renderNotes() {
     const scroll = list.scrollTop; list.replaceChildren();
     trashButton.classList.toggle('wnb-selected', showTrash);
-    trashButton.title = showTrash ? 'Вернуться к заметкам' : `Корзина (${data.trash.length})`;
+    trashButton.title = showTrash ? t('backToNotes') : t('trashCount', { count: data.trash.length });
     newButton.disabled = showTrash;
     const source = showTrash ? data.trash : data.notes;
     const visible = source.filter(note => (showTrash || query || note.tabId === activeTab) &&
         (!query || `${note.title}\n${plainText(note.html)}`.toLocaleLowerCase().includes(query)));
-    if (showTrash) list.append(make('p', 'wnb-hint', 'Корзина · заметки хранятся до удаления вручную'));
-    if (query) list.append(make('p', 'wnb-hint', `Найдено: ${visible.length}${showTrash ? '' : ' · во всех вкладках'}`));
-    if (!visible.length) list.append(make('p', 'wnb-empty', query ? 'Ничего не найдено.' : showTrash ? 'Корзина пуста.' : 'Добавь первую заметку: команду, расписание или важную деталь.'));
+    if (showTrash) list.append(make('p', 'wnb-hint', t('trashHint')));
+    if (query) list.append(make('p', 'wnb-hint', t('resultCount', { count: visible.length }) + (showTrash ? '' : t('allTabs'))));
+    if (!visible.length) list.append(make('p', 'wnb-empty', query ? t('noResults') : showTrash ? t('emptyTrash') : t('emptyNotebook')));
     for (const note of visible) {
         const card = make('article', 'wnb-card'); card.dataset.note = note.id;
         const top = make('div', 'wnb-card-header');
-        const title = button(note.collapsed ? 'Раскрыть заметку' : 'Свернуть заметку', note.collapsed ? 'chevron-right' : 'chevron-down', () => { note.collapsed = !note.collapsed; changed(); renderNotes(); }, note.title || 'Без названия');
+        const title = button(note.collapsed ? t('expandNote') : t('collapseNote'), note.collapsed ? 'chevron-right' : 'chevron-down', () => { note.collapsed = !note.collapsed; changed(); renderNotes(); }, note.title || t('untitled'));
         title.classList.add('wnb-note-title'); title.setAttribute('aria-expanded', String(!note.collapsed)); top.append(title);
         if (showTrash) {
-            top.append(button('Восстановить заметку', 'rotate-left', () => {
+            top.append(button(t('restoreNote'), 'rotate-left', () => {
                 data.trash = data.trash.filter(n => n.id !== note.id); delete note.deletedAt;
                 if (!data.tabs.some(tab => tab.id === note.tabId)) note.tabId = data.tabs[0].id;
                 data.notes.push(note); changed(); renderNotes();
             }));
-            top.append(button('Удалить навсегда', 'trash-can', () => {
-                if (confirm(`Удалить «${note.title || 'Без названия'}» навсегда?`)) { data.trash = data.trash.filter(n => n.id !== note.id); changed(); renderNotes(); }
+            top.append(button(t('deleteForever'), 'trash-can', () => {
+                if (confirm(t('confirmDeleteNote', { title: note.title || t('untitled') }))) { data.trash = data.trash.filter(n => n.id !== note.id); changed(); renderNotes(); }
             }));
         } else {
-            top.append(button('Копировать текст заметки', 'copy', () => copyNote(note)));
-            top.append(button('Редактировать заметку', 'pen', () => editNote(note)));
+            top.append(button(t('copyNote'), 'copy', () => copyNote(note)));
+            top.append(button(t('editNote'), 'pen', () => editNote(note)));
         }
         card.append(top);
-        if (query) card.append(make('small', 'wnb-note-tab', data.tabs.find(tab => tab.id === note.tabId)?.title || 'Заметки'));
+        if (query) card.append(make('small', 'wnb-note-tab', data.tabs.find(tab => tab.id === note.tabId)?.title || t('notes')));
         const content = make('div', 'wnb-rich wnb-note-body'); content.innerHTML = note.html; content.hidden = note.collapsed;
         card.append(content); list.append(card);
     }
@@ -206,22 +265,22 @@ function renderNotes() {
 }
 async function copyNote(note) {
     const text = plainText(note.html);
-    try { await navigator.clipboard.writeText(text); notify('Текст скопирован'); }
+    try { await navigator.clipboard.writeText(text); notify(t('copied')); }
     catch (error) {
         const textarea = make('textarea'); textarea.value = text; textarea.style.cssText = 'position:fixed;left:-10000px;top:0';
         const owner = document.querySelector('dialog.wnb-dialog[open]') || document.body;
         const previous = document.activeElement; owner.append(textarea); textarea.select();
         let copied = false; try { copied = document.execCommand('copy'); } catch { /* manual fallback below */ }
         textarea.remove(); previous?.focus();
-        if (copied) notify('Текст скопирован');
-        else { const { dialog, body } = modal('Скопировать текст'); const field = make('textarea'); field.value = text; field.readOnly = true; field.className = 'wnb-copy-field'; body.append(make('p', '', 'Браузер запретил буфер обмена. Нажми Ctrl+C для выделенного текста.'), field); dialog.showModal(); field.select(); }
+        if (copied) notify(t('copied'));
+        else { const { dialog, body } = modal(t('copyText')); const field = make('textarea'); field.value = text; field.readOnly = true; field.className = 'wnb-copy-field'; body.append(make('p', '', t('clipboardBlocked')), field); dialog.showModal(); field.select(); }
     }
 }
 function modal(title) {
-    const dialog = make('dialog', 'wnb-dialog'); const heading = make('header', 'wnb-dialog-header');
+    const dialog = make('dialog', 'wnb-dialog'); dialog.lang = language; const heading = make('header', 'wnb-dialog-header');
     heading.append(make('strong', 'wnb-brand', title)); const actions = make('div', 'wnb-actions');
     const finish = () => { dialog.close(); render(); };
-    actions.append(button('Закрыть редактор', 'xmark', finish)); heading.append(actions);
+    actions.append(button(t('closeEditor'), 'xmark', finish)); heading.append(actions);
     const body = make('div', 'wnb-dialog-body'); dialog.append(heading, body); document.body.append(dialog);
     dialog.addEventListener('close', () => { dialog.remove(); render(); });
     // Tavern keyboard shortcuts must not submit a message while typing a note.
@@ -230,20 +289,20 @@ function modal(title) {
     return { dialog, body, actions, finish };
 }
 function addNote() {
-    if (data.notes.length + data.trash.length >= 10000) { notify('Достигнут предел: 10 000 заметок.', true); return; }
+    if (data.notes.length + data.trash.length >= 10000) { notify(t('noteLimit'), true); return; }
     const note = { id: uid(), tabId: activeTab, title: '', html: '', collapsed: false };
     data.notes.push(note); changed(); renderNotes(); editNote(note);
 }
 function editNote(note) {
-    const { dialog, body, actions, finish } = modal('Заметка'); dialog.classList.add('wnb-editor-dialog');
-    const maximize = button('Развернуть редактор', 'expand', () => {
+    const { dialog, body, actions, finish } = modal(t('note')); dialog.classList.add('wnb-editor-dialog');
+    const maximize = button(t('expandEditor'), 'expand', () => {
         dialog.classList.toggle('wnb-fullscreen'); const full = dialog.classList.contains('wnb-fullscreen');
-        maximize.setAttribute('aria-label', full ? 'Уменьшить редактор' : 'Развернуть редактор'); maximize.title = maximize.getAttribute('aria-label');
+        maximize.setAttribute('aria-label', full ? t('shrinkEditor') : t('expandEditor')); maximize.title = maximize.getAttribute('aria-label');
     }); actions.prepend(maximize);
-    const title = make('input', 'wnb-title-input'); title.placeholder = 'Название заметки'; title.maxLength = 200; title.value = note.title; title.setAttribute('aria-label', 'Название заметки');
-    const editor = make('div', 'wnb-rich wnb-editor'); editor.contentEditable = 'true'; editor.role = 'textbox'; editor.setAttribute('aria-label', 'Текст заметки'); editor.setAttribute('aria-multiline', 'true'); editor.spellcheck = true; editor.innerHTML = note.html;
-    const toolbar = make('div', 'wnb-format'); toolbar.setAttribute('aria-label', 'Форматирование');
-    const saved = make('span', 'wnb-hint', 'Сохранено'); saved.setAttribute('role', 'status');
+    const title = make('input', 'wnb-title-input'); title.placeholder = t('noteTitle'); title.maxLength = 200; title.value = note.title; title.setAttribute('aria-label', t('noteTitle'));
+    const editor = make('div', 'wnb-rich wnb-editor'); editor.contentEditable = 'true'; editor.role = 'textbox'; editor.setAttribute('aria-label', t('noteText')); editor.setAttribute('aria-multiline', 'true'); editor.spellcheck = true; editor.dataset.placeholder = t('noteTextPlaceholder'); editor.innerHTML = note.html;
+    const toolbar = make('div', 'wnb-format'); toolbar.setAttribute('aria-label', t('formatting'));
+    const saved = make('span', 'wnb-hint', t('saved')); saved.setAttribute('role', 'status');
     const capture = () => {
         note.html = sanitize(editor.innerHTML); note.title = title.value; changed(); saved.textContent = status.textContent;
     };
@@ -262,10 +321,10 @@ function editNote(note) {
         document.execCommand('styleWithCSS', false, true);
         document.execCommand(command, false, value); rememberSelection(); capture();
     }
-    for (const [label, icon, command] of [['Жирный', 'bold', 'bold'], ['Курсив', 'italic', 'italic'], ['Подчёркивание', 'underline', 'underline'], ['Маркированный список', 'list-ul', 'insertUnorderedList'], ['Нумерованный список', 'list-ol', 'insertOrderedList'], ['Сбросить оформление', 'eraser', 'removeFormat']]) {
+    for (const [label, icon, command] of [[t('bold'), 'bold', 'bold'], [t('italic'), 'italic', 'italic'], [t('underline'), 'underline', 'underline'], [t('bullets'), 'list-ul', 'insertUnorderedList'], [t('numbers'), 'list-ol', 'insertOrderedList'], [t('clearFormatting'), 'eraser', 'removeFormat']]) {
         const b = button(label, icon, () => format(command)); b.addEventListener('mousedown', e => { rememberSelection(); e.preventDefault(); }); toolbar.append(b);
     }
-    for (const [label, command, initial] of [['Цвет текста', 'foreColor', '#92caa0'], ['Цвет маркера', 'hiliteColor', '#66513c']]) {
+    for (const [label, command, initial] of [[t('textColor'), 'foreColor', '#92caa0'], [t('highlightColor'), 'hiliteColor', '#66513c']]) {
         const holder = make('label', 'wnb-color', label); const color = make('input'); color.type = 'color'; color.value = initial; color.setAttribute('aria-label', label);
         color.addEventListener('pointerdown', rememberSelection); color.addEventListener('input', () => format(command, color.value)); holder.append(color); toolbar.append(holder);
     }
@@ -276,32 +335,32 @@ function editNote(note) {
     });
     editor.addEventListener('drop', event => event.preventDefault());
     const bottom = make('div', 'wnb-editor-footer');
-    const select = make('select'); select.setAttribute('aria-label', 'Вкладка заметки');
-    for (const tab of data.tabs) { const option = make('option', '', tab.title || 'Без названия'); option.value = tab.id; select.append(option); }
+    const select = make('select'); select.setAttribute('aria-label', t('noteTab'));
+    for (const tab of data.tabs) { const option = make('option', '', tab.title || t('untitled')); option.value = tab.id; select.append(option); }
     select.value = note.tabId; select.addEventListener('change', () => { note.tabId = select.value; changed(); });
     function moveNote(delta) {
         const siblings = data.notes.filter(n => n.tabId === note.tabId); const target = siblings[siblings.indexOf(note) + delta]; if (!target) return;
-        const a = data.notes.indexOf(note), b = data.notes.indexOf(target); [data.notes[a], data.notes[b]] = [data.notes[b], data.notes[a]]; changed(); notify('Порядок изменён');
+        const a = data.notes.indexOf(note), b = data.notes.indexOf(target); [data.notes[a], data.notes[b]] = [data.notes[b], data.notes[a]]; changed(); notify(t('orderChanged'));
     }
-    bottom.append(select, button('Выше в списке', 'arrow-up', () => moveNote(-1)), button('Ниже в списке', 'arrow-down', () => moveNote(1)), button('Копировать текст заметки', 'copy', () => copyNote(note)), button('Переместить в корзину', 'trash-can', () => {
+    bottom.append(select, button(t('moveUp'), 'arrow-up', () => moveNote(-1)), button(t('moveDown'), 'arrow-down', () => moveNote(1)), button(t('copyNote'), 'copy', () => copyNote(note)), button(t('moveToTrash'), 'trash-can', () => {
         data.notes = data.notes.filter(n => n.id !== note.id); note.deletedAt = Date.now(); data.trash.unshift(note); changed(); finish();
-    }), saved, button('Готово', 'check', finish, 'Готово'));
+    }), saved, button(t('done'), 'check', finish, t('done')));
     body.append(title, toolbar, editor, bottom); dialog.showModal(); (note.title ? editor : title).focus();
 }
 function manageTabs() {
-    const { dialog, body } = modal('Вкладки блокнота');
+    const { dialog, body } = modal(t('notebookTabs'));
     function draw() {
-        body.replaceChildren(make('p', 'wnb-hint', 'Переименуй вкладки или измени их порядок. При удалении вкладки её заметки перейдут в первую оставшуюся.'));
+        body.replaceChildren(make('p', 'wnb-hint', t('organizeTabsHint')));
         data.tabs.forEach((tab, index) => {
-            const row = make('div', 'wnb-tab-row'); const name = make('input'); name.value = tab.title; name.maxLength = 200; name.setAttribute('aria-label', 'Название вкладки');
+            const row = make('div', 'wnb-tab-row'); const name = make('input'); name.value = tab.title; name.maxLength = 200; name.setAttribute('aria-label', t('tabTitle'));
             name.addEventListener('input', () => { tab.title = name.value; changed(); renderTabs(); });
             row.append(name);
-            for (const [delta, label, icon] of [[-1, 'Передвинуть вкладку влево', 'arrow-left'], [1, 'Передвинуть вкладку вправо', 'arrow-right']]) {
+            for (const [delta, label, icon] of [[-1, t('tabLeft'), 'arrow-left'], [1, t('tabRight'), 'arrow-right']]) {
                 const b = button(label, icon, () => { [data.tabs[index], data.tabs[index + delta]] = [data.tabs[index + delta], tab]; changed(); draw(); renderTabs(); });
                 b.disabled = !data.tabs[index + delta]; row.append(b);
             }
-            const remove = button('Удалить вкладку', 'trash-can', () => {
-                if (!confirm(`Удалить вкладку «${tab.title}»? Заметки будут перенесены в первую оставшуюся вкладку.`)) return;
+            const remove = button(t('deleteTab'), 'trash-can', () => {
+                if (!confirm(t('confirmDeleteTab', { title: tab.title }))) return;
                 data.tabs = data.tabs.filter(t => t.id !== tab.id);
                 for (const note of [...data.notes, ...data.trash]) if (note.tabId === tab.id) note.tabId = data.tabs[0].id;
                 changed(); draw(); render();
@@ -324,8 +383,8 @@ function togglePanel() {
 function updateLauncherState() {
     const open = panel.style.display !== 'none';
     launcher.setAttribute('aria-expanded', String(open));
-    launcher.setAttribute('aria-label', open ? 'Закрыть Wani Notebook' : 'Открыть Wani Notebook');
-    launcher.title = open ? 'Закрыть Wani Notebook · можно перетаскивать' : 'Открыть Wani Notebook · можно перетаскивать';
+    launcher.setAttribute('aria-label', open ? t('closeNotebook') : t('openNotebook'));
+    launcher.title = open ? t('closeDrag') : t('openDrag');
     launcher.classList.toggle('wnb-open', open);
 }
 function setupLauncherDrag() {
@@ -341,7 +400,7 @@ function setupLauncherDrag() {
     function savePosition() {
         const rect = launcher.getBoundingClientRect();
         try { localStorage.setItem(key, JSON.stringify({ left: rect.left, top: rect.top })); }
-        catch { notify('Не удалось сохранить положение кнопки.', true); }
+        catch { notify(t('cannotSavePosition'), true); }
     }
     try {
         const saved = JSON.parse(localStorage.getItem(key));
@@ -423,16 +482,16 @@ window.addEventListener('resize', fitWindow);
 function connect() {
     const host = window.WaniRoleplayTools; if (host?.version !== 1) return;
     host.register({ id: 'notebook', title: 'Notebook', element: panel, launcher, controls, display: 'flex', minHeight: 230,
-        defaultPage: { id: 'notebook', name: 'Блокнот' },
+        defaultPage: { id: 'notebook', name: t('notebookPage') },
         onMount() { panel.style.resize = 'none'; },
         onRelease() { panel.style.resize = ''; fitWindow(); fitLauncher(); updateLauncherState(); },
     });
 }
 window.addEventListener('wani-roleplay-tools:ready', connect);
-render(); connect();
+applyLanguage(); connect();
 if (startupErrors.length) {
-    status.textContent = 'Ошибка чтения данных';
-    notify(`${startupErrors.join(' ')} Исходные копии не перезаписаны. При необходимости сохрани доступные заметки экспортом.`, true);
+    setStatus('readError');
+    notify(`${startupErrors.join(' ')} ${t('recoveryHint')}`, true);
 } else {
     // Recover newer browser changes after a server interruption.
     save();

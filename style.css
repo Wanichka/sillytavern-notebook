@@ -1,4 +1,4 @@
-/* Wani Notebook: original styles, matching the Wani extension family. */
+/* Notebook styles. */
 #wnb-panel, #wnb-launcher, .wnb-dialog, .wnb-toast {
     --wnb-bg: var(--SmartThemeBlurTintColor, #0b1720);
     --wnb-text: var(--SmartThemeBodyColor, #dedbd5);
@@ -103,7 +103,7 @@
 .wnb-color { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
 .wnb-color input { width: 30px; height: 28px; padding: 2px; border: 1px solid var(--wnb-line); background: var(--wnb-hover); border-radius: 5px; cursor: pointer; }
 .wnb-editor { flex: 1; min-height: 100px; overflow: auto; padding: 14px; background: var(--wnb-soft); border: 1px solid var(--wnb-line); border-radius: 7px; outline-offset: -2px; }
-.wnb-editor:empty::before { content: 'Текст заметки…'; color: var(--wnb-muted); pointer-events: none; }
+.wnb-editor:empty::before { content: attr(data-placeholder); color: var(--wnb-muted); pointer-events: none; }
 .wnb-editor-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 0 0 auto; }
 .wnb-editor-footer select { flex: 1; max-width: 220px; }
 .wnb-editor-footer .wnb-hint { margin-left: auto; }
