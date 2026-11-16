@@ -2,6 +2,8 @@
 
 A personal notebook for SillyTavern with tabs, individual notes, rich text formatting, and quick copying. Independently implemented by Wanichka, without code from Extension-Notebook.
 
+![Notebook panel with tabs, a search box, and note cards containing reusable snippets](docs/screenshots/notebook.png)
+
 ## Installation
 
 Go to **Extensions → Install extension** and enter `https://github.com/Wanichka/sillytavern-notebook`. You can leave the branch field empty (`main`). Reload Tavern. Use the update button in the extension manager to install updates.
